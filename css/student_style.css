@@ -1,0 +1,266 @@
+.view-section {
+    animation: fadeIn 0.3s ease;
+}
+
+.btn.large {
+    padding: 15px 30px;
+    font-size: 1.2em;
+    background: #4299e1;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.btn.large:hover {
+    background: #3182ce;
+}
+
+/* Split View Layout */
+.split-view {
+    display: flex;
+    height: 100%;
+    gap: 20px;
+}
+
+.sidebar {
+    width: 300px;
+    background: #1a202c;
+    border-radius: 10px;
+    padding: 15px;
+    overflow-y: auto;
+    flex-shrink: 0;
+    border: 1px solid #4a5568;
+}
+
+.main-content {
+    flex-grow: 1;
+    background: #2d3748;
+    border-radius: 10px;
+    padding: 20px;
+    overflow-y: auto;
+    border: 1px solid #4a5568;
+    position: relative;
+}
+
+.placeholder-text {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: #a0aec0;
+    font-size: 1.2em;
+}
+
+/* Sidebar Items */
+.sidebar-item {
+    padding: 10px;
+    margin-bottom: 5px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.2s;
+    color: #e2e8f0;
+}
+
+.sidebar-item:hover {
+    background: #2c3546;
+}
+
+.sidebar-item.active {
+    background: #2b6cb0;
+    color: white;
+}
+
+/* Topic Tree */
+.topic-tree-item {
+    margin-bottom: 5px;
+}
+
+.topic-header {
+    padding: 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    position: relative; /* For tooltip positioning if needed, though title attr works */
+}
+
+.topic-header:hover {
+    background: #2c3546;
+}
+
+.topic-subitems {
+    margin-left: 20px;
+    display: none;
+}
+
+.topic-subitems.open {
+    display: block;
+}
+
+.subitem {
+    padding: 8px;
+    font-size: 0.9em;
+    color: #a0aec0;
+    cursor: pointer;
+    border-radius: 4px;
+}
+
+.subitem:hover {
+    background: #2c3546;
+    color: #e2e8f0;
+}
+
+/* Question Card */
+.question-card {
+    background: #1a202c;
+    border: 1px solid #4a5568;
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 15px;
+}
+
+.question-meta {
+    font-size: 0.9em;
+    color: #a0aec0;
+    margin-bottom: 15px;
+    display: flex;
+    gap: 15px;
+    border-bottom: 1px solid #4a5568;
+    padding-bottom: 10px;
+}
+
+.question-text {
+    font-size: 1.2em;
+    margin-bottom: 20px;
+    white-space: pre-wrap;
+    line-height: 1.5;
+}
+
+/* MCQ Options */
+.mcq-options {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.mcq-option {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 15px;
+    background: #2d3748;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+    border: 1px solid transparent;
+}
+
+.mcq-option:hover {
+    background: #3a4a63;
+}
+
+.mcq-option.selected {
+    background: #2b6cb0;
+    border-color: #4299e1;
+}
+
+.mcq-option.correct-answer {
+    background: #2f855a; /* Green bg */
+    border-color: #48bb78;
+}
+
+.mcq-option.wrong-answer {
+    background: #c53030; /* Red bg */
+    border-color: #f56565;
+}
+
+/* Structural Input */
+.structural-input-area {
+    margin-top: 20px;
+}
+
+.structural-input {
+    width: 100%;
+    min-height: 100px;
+    background: #1a202c;
+    border: 1px solid #4a5568;
+    color: #e2e8f0;
+    padding: 10px;
+    border-radius: 6px;
+    margin-bottom: 10px;
+    font-family: inherit;
+    resize: vertical;
+}
+
+.structural-answer {
+    margin-top: 15px;
+    padding: 15px;
+    background: #2d3748;
+    border-radius: 6px;
+    border-left: 4px solid #48bb78;
+}
+
+.highlight {
+    background-color: rgba(255, 255, 0, 0.3);
+    color: #fff;
+    font-weight: bold;
+    padding: 0 2px;
+    border-radius: 2px;
+}
+
+/* Action Bar */
+.action-bar {
+    margin-top: 20px;
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
+}
+
+.btn-check {
+    background: #48bb78;
+    color: white;
+}
+.btn-check:hover { background: #38a169; }
+
+.btn-skip {
+    background: #718096;
+    color: white;
+}
+.btn-skip:hover { background: #4a5568; }
+
+.btn-next {
+    background: #4299e1;
+    color: white;
+}
+.btn-next:hover { background: #3182ce; }
+
+.btn {
+    padding: 10px 20px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 1em;
+    transition: background 0.2s;
+}
+
+.show-answer-btn {
+    background: #4a5568;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+    margin-top: 10px;
+}
+
+.show-answer-btn:hover {
+    background: #2d3748;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}

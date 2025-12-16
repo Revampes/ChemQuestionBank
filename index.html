@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Student Question Bank (Standalone)</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/rich_text.css">
+    <link rel="stylesheet" href="css/student_style.css">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Student Question Bank</h1>
+            <div id="connection-panel" style="display:none;">
+                <!-- Auto-connected -->
+            </div>
+        </div>
+
+        <div class="tabs" id="main-nav">
+            <button class="tab-btn active" onclick="switchTab('home')">Home</button>
+            <button class="tab-btn" onclick="switchTab('by-year')">By Year</button>
+            <button class="tab-btn" onclick="switchTab('by-topic')">By Topic</button>
+        </div>
+
+        <div class="content-area" id="content-area" style="padding: 0;">
+            <!-- Home View -->
+            <div id="home-view" class="view-section" style="padding: 20px;">
+                <div style="text-align: center; padding: 50px;">
+                    <h2>Welcome to the Question Bank</h2>
+                    <p style="margin: 20px 0;">Select a mode to start practicing:</p>
+                    <div class="home-buttons" style="display: flex; justify-content: center; gap: 20px;">
+                        <button class="btn large" onclick="switchTab('by-year')">Practice By Year</button>
+                        <button class="btn large" onclick="switchTab('by-topic')">Practice By Topic</button>
+                    </div>
+                    <div id="loading-indicator" style="margin-top: 20px; color: #90cdf4;">
+                        Connecting to repository...
+                    </div>
+                </div>
+            </div>
+
+            <!-- By Year View -->
+            <div id="by-year-view" class="view-section" style="display:none; height: calc(100vh - 140px);">
+                <div class="split-view">
+                    <div class="sidebar" id="year-sidebar">
+                        <!-- Year list will go here -->
+                    </div>
+                    <div class="main-content" id="year-content">
+                        <div class="placeholder-text">Select a paper from the sidebar to start.</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- By Topic View -->
+            <div id="by-topic-view" class="view-section" style="display:none; height: calc(100vh - 140px);">
+                <div class="split-view">
+                    <div class="sidebar" id="topic-sidebar">
+                        <!-- Topic list will go here -->
+                    </div>
+                    <div class="main-content" id="topic-content">
+                        <div class="placeholder-text">Select a topic from the sidebar to start.</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/config.js"></script>
+    <script src="js/github.js"></script>
+    <script src="js/student_app.js"></script>
+</body>
+</html>
