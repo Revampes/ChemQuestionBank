@@ -60,6 +60,8 @@ async function autoConnect() {
         // Load Data
         await loadAllQuestions();
         
+        updateDashboardStats();
+
         if (loadingIndicator) loadingIndicator.style.display = 'none';
     } catch (err) {
         console.error(err);
@@ -141,6 +143,52 @@ function processQuestionContent(raw) {
 
     return html;
 }
+
+function updateDashboardStats() {
+    const totalQuestions = allQuestions.length;
+    const topicsCount = TOPICS.length;
+    // Calculate unique years
+    const years = new Set(allQuestions.map(q => q.year).filter(y => y));
+    const yearsCount = years.size;
+
+    const elTotal = document.getElementById('stat-total-questions');
+    const elTopics = document.getElementById('stat-topics-count');
+    const elYears = document.getElementById('stat-years-count');
+
+    // Animate numbers
+    if (elTotal) animateValue(elTotal, 0, totalQuestions, 1000);
+    if (elTopics) animateValue(elTopics, 0, topicsCount, 1000);
+    if (elYears) animateValue(elYears, 0, yearsCount, 1000);
+}
+
+function animateValue(obj, start, end, duration) {
+    let startTimestamp = null;
+    const step = (timestamp) => {
+        if (!startTimestamp) startTimestamp = timestamp;
+        const progress = Math.min((timestamp - startTimestamp) / duration, 1);
+        obj.innerHTML = Math.floor(progress * (end - start) + start);
+        if (progress < 1) {
+            window.requestAnimationFrame(step);
+        }
+    };
+    window.requestAnimationFrame(step);
+}
+
+window.startRandomPractice = function() {
+    if (allQuestions.length === 0) {
+        alert("Questions are still loading. Please wait...");
+        return;
+    }
+    
+    // Switch to practice view
+    switchTab('practice');
+    
+    // Pick 10 random questions
+    const shuffled = [...allQuestions].sort(() => 0.5 - Math.random());
+    const selected = shuffled.slice(0, 10);
+    
+    startSession(selected, 'practice-content');
+};
 
 // --- Sidebar Rendering ---
 
@@ -366,21 +414,21 @@ function renderCurrentQuestion() {
     const checkBtn = document.createElement('button');
     checkBtn.className = 'btn btn-check';
     checkBtn.textContent = 'Check Answer';
-    checkBtn.id = 'btn-check';
-    checkBtn.onclick = () => checkAnswer(q);
+    // Remove ID to avoid duplicates across tabs
+    checkBtn.onclick = () => checkAnswer(q, card);
     
     // Skip Button
     const skipBtn = document.createElement('button');
     skipBtn.className = 'btn btn-skip';
     skipBtn.textContent = 'Skip';
-    skipBtn.id = 'btn-skip';
+    // Remove ID
     skipBtn.onclick = () => nextQuestion();
     
     // Next Button (Hidden initially)
     const nextBtn = document.createElement('button');
     nextBtn.className = 'btn btn-next';
     nextBtn.textContent = 'Next Question';
-    nextBtn.id = 'btn-next';
+    // Remove ID
     nextBtn.style.display = 'none';
     nextBtn.onclick = () => nextQuestion();
     
@@ -395,7 +443,6 @@ function renderCurrentQuestion() {
 function renderMCQInteraction(container, q) {
     const optionsDiv = document.createElement('div');
     optionsDiv.className = 'mcq-options';
-    optionsDiv.id = 'mcq-options-list';
     
     if (q.options && Array.isArray(q.options)) {
         q.options.forEach(opt => {
@@ -419,7 +466,11 @@ function renderMCQInteraction(container, q) {
             
             optDiv.onclick = () => {
                 // Only allow selection if not yet checked
-                if (document.getElementById('btn-check').style.display === 'none') return;
+                // Find check button in the current card
+                const card = container.closest('.question-card');
+                const checkBtn = card ? card.querySelector('.btn-check') : null;
+                
+                if (checkBtn && checkBtn.style.display === 'none') return;
                 
                 container.querySelectorAll('.mcq-option').forEach(o => o.classList.remove('selected'));
                 optDiv.classList.add('selected');
@@ -551,13 +602,13 @@ window.insertTag = function(elementId, tag) {
     textarea.focus();
 }
 
-function checkAnswer(q) {
-    const checkBtn = document.getElementById('btn-check');
-    const skipBtn = document.getElementById('btn-skip');
-    const nextBtn = document.getElementById('btn-next');
+function checkAnswer(q, cardElement) {
+    const checkBtn = cardElement.querySelector('.btn-check');
+    const skipBtn = cardElement.querySelector('.btn-skip');
+    const nextBtn = cardElement.querySelector('.btn-next');
     
     if (q.type === 'Multiple-choice') {
-        const selected = document.querySelector('.mcq-option.selected');
+        const selected = cardElement.querySelector('.mcq-option.selected');
         if (!selected) {
             alert('Please select an option.');
             return;
@@ -567,7 +618,7 @@ function checkAnswer(q) {
         const isCorrect = selectedVal === q.correctOption;
         
         // UI Feedback
-        const options = document.querySelectorAll('.mcq-option');
+        const options = cardElement.querySelectorAll('.mcq-option');
         options.forEach(opt => {
             if (opt.dataset.value === q.correctOption) {
                 opt.classList.add('correct-answer');
@@ -583,8 +634,8 @@ function checkAnswer(q) {
         
         if (hasSubQuestions) {
             q.structuralAnswer.subQuestions.forEach((sq, index) => {
-                const input = document.getElementById(`sq-input-${index}`);
-                const answerDisplay = document.getElementById(`sq-answer-${index}`);
+                const input = cardElement.querySelector(`#sq-input-${index}`);
+                const answerDisplay = cardElement.querySelector(`#sq-answer-${index}`);
                 if (!input || !answerDisplay) return;
                 
                 const userText = input.value;
@@ -613,7 +664,7 @@ function checkAnswer(q) {
             });
             
             // Also show main full answer if exists
-            const mainAnswerDisplay = document.getElementById('structural-answer-display');
+            const mainAnswerDisplay = cardElement.querySelector('#structural-answer-display');
             if (mainAnswerDisplay && q.structuralAnswer.fullAnswer) {
                 let mainHtml = `<h4>General Answer / Notes:</h4>`;
                 mainHtml += `${processQuestionContent(q.structuralAnswer.fullAnswer || '')}`;
@@ -625,9 +676,9 @@ function checkAnswer(q) {
             }
 
         } else {
-            const input = document.getElementById('structural-user-input');
+            const input = cardElement.querySelector('#structural-user-input');
             const userText = input.value;
-            const answerDisplay = document.getElementById('structural-answer-display');
+            const answerDisplay = cardElement.querySelector('#structural-answer-display');
             
             // Highlight keywords
             let highlightedText = userText;

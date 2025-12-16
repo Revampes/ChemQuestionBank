@@ -7,8 +7,22 @@
     <link rel="stylesheet" href="css/style.css">
     <link rel="stylesheet" href="css/rich_text.css">
     <link rel="stylesheet" href="css/student_style.css">
+    <link rel="stylesheet" href="css/background.css">
+    <link rel="stylesheet" href="css/dashboard.css">
 </head>
 <body>
+    <div class="chem-background">
+        <div class="molecule molecule-benzene"></div>
+        <div class="molecule molecule-hexagon"></div>
+        <div class="molecule molecule-bond"></div>
+        <div class="molecule molecule-benzene"></div>
+        <div class="molecule molecule-hexagon"></div>
+        <div class="molecule molecule-bond"></div>
+        <div class="molecule molecule-benzene"></div>
+        <div class="molecule molecule-hexagon"></div>
+        <div class="molecule molecule-bond"></div>
+        <div class="molecule molecule-benzene"></div>
+    </div>
     <div class="container">
         <div class="header">
             <h1>Student Question Bank</h1>
@@ -25,17 +39,65 @@
 
         <div class="content-area" id="content-area" style="padding: 0;">
             <!-- Home View -->
-            <div id="home-view" class="view-section" style="padding: 20px;">
-                <div style="text-align: center; padding: 50px;">
-                    <h2>Welcome to the Question Bank</h2>
-                    <p style="margin: 20px 0;">Select a mode to start practicing:</p>
-                    <div class="home-buttons" style="display: flex; justify-content: center; gap: 20px;">
-                        <button class="btn large" onclick="switchTab('by-year')">Practice By Year</button>
-                        <button class="btn large" onclick="switchTab('by-topic')">Practice By Topic</button>
+            <div id="home-view" class="view-section" style="padding: 40px;">
+                <div class="home-hero">
+                    <h2>Master Chemistry</h2>
+                    <p>Comprehensive Question Bank for HKDSE, AL, and CE Chemistry</p>
+                </div>
+            
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-icon">📚</div>
+                        <div class="stat-info">
+                            <div class="stat-value" id="stat-total-questions">...</div>
+                            <div class="stat-label">Total Questions</div>
+                        </div>
                     </div>
-                    <div id="loading-indicator" style="margin-top: 20px; color: #90cdf4;">
-                        Connecting to repository...
+                    <div class="stat-card">
+                        <div class="stat-icon">⚗️</div>
+                        <div class="stat-info">
+                            <div class="stat-value" id="stat-topics-count">...</div>
+                            <div class="stat-label">Topics</div>
+                        </div>
                     </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">📅</div>
+                        <div class="stat-info">
+                            <div class="stat-value" id="stat-years-count">...</div>
+                            <div class="stat-label">Years Covered</div>
+                        </div>
+                    </div>
+                </div>
+            
+                <h3 style="margin-bottom: 20px; color: #e2e8f0;">Start Practicing</h3>
+                <div class="action-cards">
+                    <div class="action-card" onclick="switchTab('by-year')">
+                        <div class="card-icon">📅</div>
+                        <h3>By Year</h3>
+                        <p>Simulate exam conditions by solving past papers year by year.</p>
+                    </div>
+                    <div class="action-card" onclick="switchTab('by-topic')">
+                        <div class="card-icon">🧪</div>
+                        <h3>By Topic</h3>
+                        <p>Focus on specific areas like Acids & Bases, Redox, or Organic Chem.</p>
+                    </div>
+                    <div class="action-card" onclick="startRandomPractice()">
+                        <div class="card-icon">🎲</div>
+                        <h3>Random Quiz</h3>
+                        <p>Test your knowledge with a quick random selection of 10 questions.</p>
+                    </div>
+                </div>
+                
+                <div id="loading-indicator" class="loading-status">
+                    <div class="spinner"></div>
+                    <span>Connecting to repository...</span>
+                </div>
+            </div>
+
+            <!-- Practice View (Full Width) -->
+            <div id="practice-view" class="view-section" style="display:none; height: calc(100vh - 140px);">
+                <div class="main-content" id="practice-content" style="height: 100%;">
+                    <!-- Questions will be rendered here -->
                 </div>
             </div>
 
