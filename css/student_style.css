@@ -264,3 +264,306 @@
     from { opacity: 0; transform: translateY(10px); }
     to { opacity: 1; transform: translateY(0); }
 }
+
+.question-stats-chip {
+    background: rgba(226, 232, 240, 0.08);
+    border: 1px solid rgba(236, 201, 75, 0.4);
+    border-radius: 999px;
+    padding: 8px 18px;
+    font-size: 0.9em;
+    display: inline-flex;
+    gap: 14px;
+    color: #f7fafc;
+    margin-bottom: 15px;
+}
+
+.year-detail-panel {
+    background: linear-gradient(135deg, rgba(26, 32, 44, 0.9), rgba(45, 55, 72, 0.95));
+    border: 1px solid rgba(236, 201, 75, 0.3);
+    border-radius: 16px;
+    padding: 30px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.year-detail-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 20px;
+}
+
+.year-detail-header h3 {
+    font-size: 2em;
+    color: #fbd38d;
+    letter-spacing: 1px;
+}
+
+.year-count-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 12px;
+    width: 100%;
+}
+
+.year-count-chip {
+    background: rgba(15, 23, 42, 0.4);
+    border: 1px solid rgba(66, 153, 225, 0.4);
+    border-radius: 12px;
+    padding: 14px;
+    text-align: center;
+}
+
+.year-count-chip span {
+    display: block;
+    font-size: 0.8em;
+    color: #a0aec0;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+}
+
+.year-count-chip strong {
+    display: block;
+    font-size: 1.4em;
+    color: #bee3f8;
+}
+
+.paper-action-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 15px;
+}
+
+.paper-action {
+    background: rgba(26, 32, 44, 0.8);
+    border: 1px solid rgba(74, 85, 104, 0.8);
+    border-radius: 12px;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.paper-action button {
+    margin-top: auto;
+    width: 100%;
+}
+
+.stats-stack {
+    display: flex;
+    gap: 20px;
+    flex-wrap: wrap;
+}
+
+.stats-card {
+    flex: 1;
+    min-width: 180px;
+    background: rgba(15, 23, 42, 0.6);
+    border: 1px solid rgba(226, 232, 240, 0.1);
+    border-radius: 12px;
+    padding: 15px;
+}
+
+.paper-toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.countdown-pill {
+    background: rgba(236, 201, 75, 0.15);
+    border: 1px solid rgba(236, 201, 75, 0.4);
+    border-radius: 999px;
+    padding: 8px 18px;
+    font-size: 1em;
+    color: #f6ad55;
+}
+
+.paper-preview-section {
+    margin-bottom: 25px;
+}
+
+.paper-preview-section h4 {
+    margin-bottom: 10px;
+    color: #fbd38d;
+    font-size: 1.3em;
+}
+
+.preview-card {
+    border: 1px solid rgba(74, 85, 104, 0.8);
+    border-radius: 10px;
+    padding: 18px;
+    margin-bottom: 12px;
+    background: rgba(15, 23, 42, 0.6);
+}
+
+.preview-card .answer-block {
+    margin-top: 12px;
+    padding: 12px;
+    border-left: 3px solid #f6ad55;
+    background: rgba(246, 173, 85, 0.1);
+}
+
+.paper-attempt {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.paper-attempt-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 15px;
+}
+
+.paper-attempt-header h3 {
+    font-size: 1.8em;
+}
+
+.attempt-timer {
+    font-size: 1.4em;
+    color: #90cdf4;
+    padding: 8px 14px;
+    border: 1px solid rgba(144, 205, 244, 0.4);
+    border-radius: 10px;
+}
+
+.paper-question-card {
+    border: 1px solid rgba(74, 85, 104, 0.7);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 15px;
+    background: rgba(17, 24, 39, 0.8);
+}
+
+.paper-question-card h5 {
+    margin-bottom: 10px;
+    color: #f7fafc;
+}
+
+.mark-input {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 10px;
+}
+
+.mark-input input {
+    width: 80px;
+    padding: 6px 10px;
+    background: rgba(15, 23, 42, 0.8);
+    border: 1px solid rgba(237, 137, 54, 0.6);
+    border-radius: 8px;
+    color: #f7fafc;
+}
+
+.answer-review {
+    display: flex;
+    flex-direction: column;
+    gap: 25px;
+}
+
+.scoreboard {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 15px;
+}
+
+.score-chip {
+    border: 1px solid rgba(66, 153, 225, 0.5);
+    border-radius: 14px;
+    padding: 16px;
+    background: rgba(15, 23, 42, 0.7);
+}
+
+.score-chip span {
+    display: block;
+    font-size: 0.8em;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: #a0aec0;
+}
+
+.score-chip strong {
+    display: block;
+    font-size: 1.8em;
+    color: #bee3f8;
+}
+
+.mc-review-list {
+    border: 1px solid rgba(74, 85, 104, 0.7);
+    border-radius: 12px;
+    padding: 15px;
+    background: rgba(15, 23, 42, 0.6);
+}
+
+.mc-review-item {
+    display: flex;
+    justify-content: space-between;
+    border-bottom: 1px solid rgba(74, 85, 104, 0.5);
+    padding: 8px 0;
+    font-size: 0.95em;
+}
+
+.mc-review-item:last-child {
+    border-bottom: none;
+}
+
+.topic-stats-banner {
+    margin-top: 30px;
+    border: 1px solid rgba(236, 201, 75, 0.4);
+    border-radius: 12px;
+    padding: 18px;
+    background: rgba(26, 32, 44, 0.8);
+    display: flex;
+    gap: 30px;
+    flex-wrap: wrap;
+}
+
+.topic-stats-banner div {
+    flex: 1;
+    min-width: 160px;
+}
+
+.topic-stats-banner span {
+    display: block;
+    font-size: 0.85em;
+    color: #a0aec0;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin-bottom: 6px;
+}
+
+.topic-stats-banner strong {
+    font-size: 1.7em;
+    color: #fbd38d;
+}
+
+.preview-answer-options {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.preview-option {
+    border: 1px solid rgba(74, 85, 104, 0.7);
+    border-radius: 8px;
+    padding: 10px 14px;
+    background: rgba(15, 23, 42, 0.7);
+    display: block;
+    line-height: 1.4;
+}
+
+.preview-option.correct {
+    border-color: rgba(72, 187, 120, 0.8);
+    background: rgba(47, 133, 90, 0.3);
+}
+
+.preview-option.incorrect {
+    border-color: rgba(245, 101, 101, 0.5);
+    background: rgba(197, 48, 48, 0.15);
+}

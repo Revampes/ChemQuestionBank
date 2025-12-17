@@ -8,6 +8,118 @@ let currentSession = {
     answers: {} // { questionId: { selected: 'A', isCorrect: true } }
 };
 
+const STORAGE_KEYS = {
+    stats: 'chem_question_stats',
+    attempts: 'chem_attempt_history'
+};
+
+let yearIndex = {};
+let activeAttempt = null;
+
+function getStoredStats() {
+    try {
+        const raw = localStorage.getItem(STORAGE_KEYS.stats);
+        if (raw) return JSON.parse(raw);
+    } catch (err) {
+        console.warn('Unable to parse stored stats', err);
+    }
+    return { questions: {}, topics: {}, years: {} };
+}
+
+function saveStoredStats(stats) {
+    localStorage.setItem(STORAGE_KEYS.stats, JSON.stringify(stats));
+}
+
+function ensureStatsEntry(bucket, key, label) {
+    if (!bucket[key]) {
+        bucket[key] = { attempts: 0, correct: 0, incorrect: 0, label: label || key };
+    } else if (label && !bucket[key].label) {
+        bucket[key].label = label;
+    }
+    return bucket[key];
+}
+
+function normalizeTextKey(str) {
+    return (str || '')
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .slice(0, 80);
+}
+
+function getQuestionKey(q) {
+    if (!q) return 'unknown-question';
+    return q.id || q.uid || q.questionId || `${q.topicId || 'topic'}-${q.source || 'src'}-${q.year || 'year'}-${normalizeTextKey(q.question)}`;
+}
+
+function buildYearKey(q) {
+    return `${q.source || 'Unknown'} ${q.year || 'N/A'}`.trim();
+}
+
+function recordQuestionAttempt(q, isCorrect) {
+    if (!q) return;
+    const stats = getStoredStats();
+    const questionKey = getQuestionKey(q);
+    const questionEntry = ensureStatsEntry(stats.questions, questionKey, q.question ? q.question.slice(0, 60) : questionKey);
+    questionEntry.attempts += 1;
+    if (isCorrect === true) questionEntry.correct += 1;
+    if (isCorrect === false) questionEntry.incorrect += 1;
+
+    const topicId = q.topicId || 'Unknown-Topic';
+    const topicEntry = ensureStatsEntry(stats.topics, topicId, q.topicName || topicId);
+    topicEntry.attempts += 1;
+    if (isCorrect === true) topicEntry.correct += 1;
+    if (isCorrect === false) topicEntry.incorrect += 1;
+
+    const yearKey = buildYearKey(q);
+    const yearEntry = ensureStatsEntry(stats.years, yearKey, yearKey);
+    yearEntry.attempts += 1;
+    if (isCorrect === true) yearEntry.correct += 1;
+    if (isCorrect === false) yearEntry.incorrect += 1;
+
+    saveStoredStats(stats);
+}
+
+function getQuestionStatsEntry(q) {
+    const stats = getStoredStats();
+    return stats.questions[getQuestionKey(q)] || { attempts: 0, correct: 0, incorrect: 0 };
+}
+
+function getTopicStats(topicId) {
+    const stats = getStoredStats();
+    return stats.topics[topicId] || { attempts: 0, correct: 0, incorrect: 0 };
+}
+
+function getYearStats(yearKey) {
+    const stats = getStoredStats();
+    return stats.years[yearKey] || { attempts: 0, correct: 0, incorrect: 0 };
+}
+
+function escapeRegExp(str) {
+    return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function highlightWithKeywords(text, keywords = []) {
+    if (!text) return '';
+    let sanitized = text
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/\n/g, '<br>');
+
+    keywords
+        .filter(Boolean)
+        .forEach(keyword => {
+            const regex = new RegExp(`(${escapeRegExp(keyword)})`, 'gi');
+            sanitized = sanitized.replace(regex, '<span class="highlight">$1</span>');
+        });
+
+    return sanitized;
+}
+
+function getSafeDomId(prefix, key) {
+    return `${prefix}-${key}`.replace(/[^a-zA-Z0-9_-]/g, '');
+}
+
 // Hardcoded Repo Info
 const REPO_CONFIG = {
     owner: 'Revampes',
@@ -101,6 +213,8 @@ async function loadAllQuestions() {
             }
         }
         console.log(`Loaded ${allQuestions.length} questions.`);
+
+        buildYearIndex();
         
         // Initial render sidebars
         renderYearSidebar();
@@ -109,6 +223,33 @@ async function loadAllQuestions() {
     } catch (err) {
         console.error('Error loading questions:', err);
     }
+}
+
+function buildYearIndex() {
+    yearIndex = {};
+    allQuestions.forEach(q => {
+        const key = buildYearKey(q);
+        if (!yearIndex[key]) {
+            yearIndex[key] = {
+                key,
+                source: q.source,
+                year: q.year,
+                parts: { '1A': [], '1B': [], '2': [] }
+            };
+        }
+        const part = getPaperPart(q);
+        yearIndex[key].parts[part].push(q);
+    });
+}
+
+function getPaperPart(q) {
+    if (!q) return '1A';
+    if (q.paperPart) return q.paperPart;
+    if ((q.type || '').toLowerCase() === 'multiple-choice') return '1A';
+    const topicId = (q.topicId || '').toLowerCase();
+    if (topicId.includes('elective')) return '2';
+    if ((q.section || '').toLowerCase().includes('elective')) return '2';
+    return '1B';
 }
 
 function resolveImageUrl(path) {
@@ -195,53 +336,655 @@ window.startRandomPractice = function() {
 function renderYearSidebar() {
     const sidebar = document.getElementById('year-sidebar');
     sidebar.innerHTML = '';
-    
-    const validSources = ['DSE', 'AL', 'CE'];
-    const groups = {};
-    
-    allQuestions.forEach(q => {
-        if (validSources.includes(q.source)) {
-            const key = `${q.source} ${q.year || 'Unknown'}`;
-            if (!groups[key]) groups[key] = [];
-            groups[key].push(q);
-        }
-    });
-    
-    // Sort keys (DSE 2023 > DSE 2022 ... > AL ... > CE ...)
-    const sortedKeys = Object.keys(groups).sort((a, b) => {
-        // Extract source and year
-        const [sourceA, yearA] = a.split(' ');
-        const [sourceB, yearB] = b.split(' ');
-        
-        // Custom source order
+
+    const keys = Object.keys(yearIndex);
+    if (keys.length === 0) {
+        const emptyState = document.createElement('div');
+        emptyState.className = 'placeholder-text';
+        emptyState.textContent = 'No yearly papers available yet.';
+        sidebar.appendChild(emptyState);
+        return;
+    }
+
+    const sortedKeys = keys.sort((a, b) => {
+        const [sourceA = '', yearA = '0'] = a.split(' ');
+        const [sourceB = '', yearB = '0'] = b.split(' ');
         const sourceOrder = { 'DSE': 0, 'AL': 1, 'CE': 2 };
-        if (sourceOrder[sourceA] !== sourceOrder[sourceB]) {
-            return sourceOrder[sourceA] - sourceOrder[sourceB];
-        }
-        // Year ascending (smallest to biggest)
-        return parseInt(yearA) - parseInt(yearB);
+        const orderA = sourceOrder[sourceA] !== undefined ? sourceOrder[sourceA] : 3;
+        const orderB = sourceOrder[sourceB] !== undefined ? sourceOrder[sourceB] : 3;
+        if (orderA !== orderB) return orderA - orderB;
+        return (parseInt(yearA, 10) || 0) - (parseInt(yearB, 10) || 0);
     });
-    
-    sortedKeys.forEach(key => {
+
+    sortedKeys.forEach((key, idx) => {
         const item = document.createElement('div');
         item.className = 'sidebar-item';
         item.textContent = key;
         item.onclick = () => {
-            // Highlight active
             sidebar.querySelectorAll('.sidebar-item').forEach(i => i.classList.remove('active'));
             item.classList.add('active');
-            
-            // Start session
-            // Sort: MCQ first, then Structural
-            const questions = groups[key].sort((a, b) => {
-                const typeA = a.type === 'Multiple-choice' ? 0 : 1;
-                const typeB = b.type === 'Multiple-choice' ? 0 : 1;
-                return typeA - typeB;
-            });
-            startSession(questions, 'year-content');
+            renderYearLanding(key);
         };
+        if (idx === 0) item.classList.add('active');
         sidebar.appendChild(item);
     });
+
+    renderYearLanding(sortedKeys[0]);
+}
+
+function renderYearLanding(yearKey) {
+    const container = document.getElementById('year-content');
+    if (!container) return;
+    const yearData = yearIndex[yearKey];
+    if (!yearData) {
+        container.innerHTML = '<div class="placeholder-text">No paper data found for this year.</div>';
+        return;
+    }
+
+    const stats = getYearStats(yearKey);
+    const counts = {
+        '1A': yearData.parts['1A'].length,
+        '1B': yearData.parts['1B'].length,
+        '2': yearData.parts['2'].length
+    };
+
+    container.innerHTML = '';
+    const panel = document.createElement('div');
+    panel.className = 'year-detail-panel';
+
+    const header = document.createElement('div');
+    header.className = 'year-detail-header';
+    const headingBlock = document.createElement('div');
+    headingBlock.innerHTML = `
+        <p style="text-transform:uppercase; letter-spacing:0.3em; color:#a0aec0;">${yearData.source || 'Exam'}</p>
+        <h3>${yearKey}</h3>
+    `;
+
+    const countGrid = document.createElement('div');
+    countGrid.className = 'year-count-grid';
+    ['1A', '1B', '2'].forEach(part => {
+        const chip = document.createElement('div');
+        chip.className = 'year-count-chip';
+        chip.innerHTML = `<span>Paper ${part}</span><strong>${counts[part]}</strong>`;
+        countGrid.appendChild(chip);
+    });
+    headingBlock.appendChild(countGrid);
+    header.appendChild(headingBlock);
+
+    const statsStack = document.createElement('div');
+    statsStack.className = 'stats-stack';
+    const statsMap = [
+        { label: 'Attempts', value: stats.attempts },
+        { label: 'Correct', value: stats.correct },
+        { label: 'Incorrect', value: stats.incorrect }
+    ];
+    statsMap.forEach(item => {
+        const card = document.createElement('div');
+        card.className = 'stats-card';
+        card.innerHTML = `<span style="font-size:0.8em; text-transform:uppercase; letter-spacing:0.2em; color:#a0aec0;">${item.label}</span><h4 style="font-size:2em; color:#fbd38d;">${item.value || 0}</h4>`;
+        statsStack.appendChild(card);
+    });
+    header.appendChild(statsStack);
+    panel.appendChild(header);
+
+    const actionGrid = document.createElement('div');
+    actionGrid.className = 'paper-action-grid';
+
+    const previewCard = document.createElement('div');
+    previewCard.className = 'paper-action';
+    previewCard.innerHTML = '<h4>Preview Paper</h4><p>Quickly skim through every answer from MC to long questions before attempting.</p>';
+    const previewBtn = document.createElement('button');
+    previewBtn.className = 'btn';
+    previewBtn.textContent = 'Preview';
+    previewBtn.onclick = () => renderYearPreview(yearKey);
+    previewBtn.disabled = counts['1A'] + counts['1B'] + counts['2'] === 0;
+    previewCard.appendChild(previewBtn);
+    actionGrid.appendChild(previewCard);
+
+    const paper1Card = document.createElement('div');
+    paper1Card.className = 'paper-action';
+    paper1Card.innerHTML = '<h4>Attempt Paper 1</h4><p>Includes Paper 1A (MC) & 1B (structured). Full exam timer: 2 hrs 30 mins.</p>';
+    const paper1Btn = document.createElement('button');
+    paper1Btn.className = 'btn';
+    paper1Btn.textContent = 'Start Paper 1';
+    paper1Btn.onclick = () => startPaperAttempt(yearKey, 'paper1');
+    paper1Btn.disabled = counts['1A'] + counts['1B'] === 0;
+    paper1Card.appendChild(paper1Btn);
+    actionGrid.appendChild(paper1Card);
+
+    const paper2Card = document.createElement('div');
+    paper2Card.className = 'paper-action';
+    paper2Card.innerHTML = '<h4>Attempt Paper 2</h4><p>Elective-focused long questions. Timer: 1 hr.</p>';
+    const paper2Btn = document.createElement('button');
+    paper2Btn.className = 'btn';
+    paper2Btn.textContent = 'Start Paper 2';
+    paper2Btn.onclick = () => startPaperAttempt(yearKey, 'paper2');
+    paper2Btn.disabled = counts['2'] === 0;
+    paper2Card.appendChild(paper2Btn);
+    actionGrid.appendChild(paper2Card);
+
+    panel.appendChild(actionGrid);
+    container.appendChild(panel);
+}
+
+function renderYearPreview(yearKey) {
+    const container = document.getElementById('year-content');
+    const yearData = yearIndex[yearKey];
+    if (!container || !yearData) return;
+
+    container.innerHTML = '';
+    const toolbar = document.createElement('div');
+    toolbar.className = 'paper-toolbar';
+    const backBtn = document.createElement('button');
+    backBtn.className = 'btn btn-secondary';
+    backBtn.textContent = 'Back to Actions';
+    backBtn.onclick = () => renderYearLanding(yearKey);
+    toolbar.appendChild(backBtn);
+    const info = document.createElement('div');
+    info.className = 'countdown-pill';
+    info.textContent = 'Preview mode · Answers only';
+    toolbar.appendChild(info);
+    container.appendChild(toolbar);
+
+    ['1A', '1B', '2'].forEach(part => {
+        const questions = yearData.parts[part];
+        if (!questions || questions.length === 0) return;
+        const section = document.createElement('div');
+        section.className = 'paper-preview-section';
+        const title = document.createElement('h4');
+        const labelMap = { '1A': 'Paper 1A · Multiple Choice', '1B': 'Paper 1B · Structured', '2': 'Paper 2 · Elective' };
+        title.textContent = labelMap[part] || part;
+        section.appendChild(title);
+        questions.forEach((q, index) => {
+            const card = createPreviewCard(q, index);
+            section.appendChild(card);
+        });
+        container.appendChild(section);
+    });
+}
+
+function createPreviewCard(q, index) {
+    const card = document.createElement('div');
+    card.className = 'preview-card';
+    card.innerHTML = `
+        <div style="font-size:0.85em; color:#a0aec0; letter-spacing:0.08em; text-transform:uppercase; margin-bottom:8px;">Q${index + 1} · ${q.topicName || ''}</div>
+        <div class="question-text" style="margin-bottom:10px;">${processQuestionContent(q.question)}</div>
+    `;
+    if (q.image) {
+        const img = document.createElement('img');
+        img.src = resolveImageUrl(q.image);
+        img.style.maxWidth = '100%';
+        img.style.marginBottom = '10px';
+        card.appendChild(img);
+    }
+
+    const answerBlock = document.createElement('div');
+    answerBlock.className = 'answer-block';
+    if ((q.type || '').toLowerCase() === 'multiple-choice') {
+        const options = Array.isArray(q.options) ? q.options : [];
+        const optsWrap = document.createElement('div');
+        optsWrap.className = 'preview-answer-options';
+        options.forEach(opt => {
+            const optDiv = document.createElement('div');
+            optDiv.className = 'preview-option';
+            if (opt.option === q.correctOption) optDiv.classList.add('correct');
+            else optDiv.classList.add('incorrect');
+            optDiv.innerHTML = `<span style="font-weight:bold; margin-right:10px;">${opt.option}.</span> ${processQuestionContent(opt.content || '')}`;
+            optsWrap.appendChild(optDiv);
+        });
+        answerBlock.appendChild(optsWrap);
+    } else if (q.structuralAnswer) {
+        answerBlock.innerHTML = `
+            <strong>Suggested Answer:</strong>
+            <div>${processQuestionContent(q.structuralAnswer.fullAnswer || q.structuralAnswer.subAnswer || 'No answer provided.')}</div>
+        `;
+    } else {
+        answerBlock.textContent = 'No stored answer for this question yet.';
+    }
+    card.appendChild(answerBlock);
+
+    const stats = getQuestionStatsEntry(q);
+    const statLine = document.createElement('div');
+    statLine.className = 'question-stats-chip';
+    statLine.innerHTML = `<span>Attempts ${stats.attempts || 0}</span><span>Correct ${stats.correct || 0}</span><span>Incorrect ${stats.incorrect || 0}</span>`;
+    card.appendChild(statLine);
+
+    return card;
+}
+
+function startPaperAttempt(yearKey, mode) {
+    const yearData = yearIndex[yearKey];
+    if (!yearData) {
+        alert('No data for the selected year.');
+        return;
+    }
+
+    if (activeAttempt && !activeAttempt.finished) {
+        const abandon = confirm('You already have an active paper. Abandon it and start a new one?');
+        if (!abandon) return;
+        if (activeAttempt.timerInterval) clearInterval(activeAttempt.timerInterval);
+    }
+
+    const sections = [];
+    if (mode === 'paper2') {
+        if (yearData.parts['2'].length > 0) {
+            sections.push({ part: '2', questions: [...yearData.parts['2']] });
+        }
+    } else {
+        if (yearData.parts['1A'].length > 0) sections.push({ part: '1A', questions: [...yearData.parts['1A']] });
+        if (yearData.parts['1B'].length > 0) sections.push({ part: '1B', questions: [...yearData.parts['1B']] });
+    }
+
+    if (sections.length === 0) {
+        alert('This paper does not contain any questions yet.');
+        return;
+    }
+
+    const duration = mode === 'paper2' ? 60 * 60 : 150 * 60; // seconds
+    activeAttempt = {
+        yearKey,
+        mode,
+        sections,
+        responses: {},
+        durationSeconds: duration,
+        remainingSeconds: duration,
+        timerInterval: null,
+        startedAt: Date.now(),
+        finished: false,
+        reviewData: null
+    };
+
+    renderPaperAttempt();
+    startAttemptTimer();
+}
+
+function renderPaperAttempt() {
+    if (!activeAttempt) return;
+    const container = document.getElementById('year-content');
+    if (!container) return;
+
+    container.innerHTML = '';
+    const wrapper = document.createElement('div');
+    wrapper.className = 'paper-attempt';
+
+    const header = document.createElement('div');
+    header.className = 'paper-attempt-header';
+    const title = document.createElement('h3');
+    title.textContent = `${activeAttempt.yearKey} · ${activeAttempt.mode === 'paper2' ? 'Paper 2' : 'Paper 1'}`;
+    header.appendChild(title);
+
+    const timer = document.createElement('div');
+    timer.id = 'attempt-timer';
+    timer.className = 'attempt-timer';
+    timer.textContent = formatSeconds(activeAttempt.remainingSeconds);
+    header.appendChild(timer);
+
+    const exitBtn = document.createElement('button');
+    exitBtn.className = 'btn btn-warning';
+    exitBtn.textContent = 'Abandon Attempt';
+    exitBtn.onclick = () => {
+        if (confirm('Are you sure you want to abandon this attempt? Progress will be lost.')) {
+            if (activeAttempt.timerInterval) clearInterval(activeAttempt.timerInterval);
+            const targetYear = activeAttempt.yearKey;
+            activeAttempt = null;
+            renderYearLanding(targetYear);
+        }
+    };
+    header.appendChild(exitBtn);
+
+    wrapper.appendChild(header);
+
+    activeAttempt.sections.forEach(section => {
+        const sectionWrap = document.createElement('div');
+        sectionWrap.className = 'paper-question-card';
+        const labelMap = { '1A': 'Paper 1A · Multiple Choice', '1B': 'Paper 1B · Structured', '2': 'Paper 2 · Elective' };
+        const sectionTitle = document.createElement('h4');
+        sectionTitle.textContent = labelMap[section.part] || section.part;
+        sectionWrap.appendChild(sectionTitle);
+
+        section.questions.forEach((q, idx) => {
+            const qCard = document.createElement('div');
+            qCard.className = 'paper-question-card';
+            const questionKey = getQuestionKey(q);
+            qCard.innerHTML = `
+                <div class="question-meta" style="margin-bottom:10px;">
+                    <span>${section.part} · Q${idx + 1}</span>
+                    <span>${q.topicName || ''}</span>
+                    <span>${q.source || ''} ${q.year || ''}</span>
+                </div>
+                <div class="question-text">${processQuestionContent(q.question)}</div>
+            `;
+
+            if (q.image) {
+                const img = document.createElement('img');
+                img.src = resolveImageUrl(q.image);
+                img.style.maxWidth = '100%';
+                img.style.margin = '12px 0';
+                qCard.appendChild(img);
+            }
+
+            const response = activeAttempt.responses[questionKey];
+            if ((q.type || '').toLowerCase() === 'multiple-choice') {
+                const optionsWrapper = document.createElement('div');
+                optionsWrapper.className = 'mcq-options';
+                (q.options || []).forEach(opt => {
+                    const optionRow = document.createElement('label');
+                    optionRow.className = 'mcq-option';
+                    const input = document.createElement('input');
+                    input.type = 'radio';
+                    input.name = getSafeDomId('mc', questionKey);
+                    input.value = opt.option;
+                    input.style.marginTop = '6px';
+                    if (response && response.selected === opt.option) input.checked = true;
+                    input.onchange = () => {
+                        activeAttempt.responses[questionKey] = { type: 'mcq', selected: opt.option };
+                    };
+                    optionRow.appendChild(input);
+                    const label = document.createElement('div');
+                    label.innerHTML = `<strong style="margin-right:8px;">${opt.option}.</strong> ${processQuestionContent(opt.content || '')}`;
+                    optionRow.appendChild(label);
+                    optionsWrapper.appendChild(optionRow);
+                });
+                qCard.appendChild(optionsWrapper);
+            } else {
+                const textarea = document.createElement('textarea');
+                textarea.className = 'structural-input';
+                textarea.placeholder = 'Type your answer here...';
+                textarea.value = response && response.text ? response.text : '';
+                textarea.oninput = (e) => {
+                    activeAttempt.responses[questionKey] = { type: 'structural', text: e.target.value };
+                };
+                qCard.appendChild(textarea);
+            }
+
+            sectionWrap.appendChild(qCard);
+        });
+
+        wrapper.appendChild(sectionWrap);
+    });
+
+    const finishBtn = document.createElement('button');
+    finishBtn.className = 'btn btn-check';
+    finishBtn.textContent = 'Finish Paper & Review';
+    finishBtn.onclick = () => finishPaperAttempt(false);
+    wrapper.appendChild(finishBtn);
+
+    container.appendChild(wrapper);
+}
+
+function startAttemptTimer() {
+    if (!activeAttempt) return;
+    if (activeAttempt.timerInterval) clearInterval(activeAttempt.timerInterval);
+    activeAttempt.timerInterval = setInterval(() => {
+        if (!activeAttempt) return;
+        activeAttempt.remainingSeconds -= 1;
+        if (activeAttempt.remainingSeconds <= 0) {
+            updateAttemptTimerDisplay();
+            finishPaperAttempt(true);
+            return;
+        }
+        updateAttemptTimerDisplay();
+    }, 1000);
+    updateAttemptTimerDisplay();
+}
+
+function updateAttemptTimerDisplay() {
+    const timer = document.getElementById('attempt-timer');
+    if (timer && activeAttempt) {
+        timer.textContent = formatSeconds(Math.max(activeAttempt.remainingSeconds, 0));
+    }
+}
+
+function finishPaperAttempt(autoTriggered = false) {
+    if (!activeAttempt || activeAttempt.finished) return;
+    if (activeAttempt.timerInterval) clearInterval(activeAttempt.timerInterval);
+    activeAttempt.finished = true;
+    activeAttempt.remainingSeconds = Math.max(0, activeAttempt.remainingSeconds);
+
+    const mcQuestions = [];
+    const longQuestions = [];
+
+    activeAttempt.sections.forEach(section => {
+        section.questions.forEach(q => {
+            const questionKey = getQuestionKey(q);
+            const response = activeAttempt.responses[questionKey] || {};
+            if ((q.type || '').toLowerCase() === 'multiple-choice') {
+                const marks = typeof q.marks === 'number' ? q.marks : 1;
+                const isCorrect = response.selected ? response.selected === q.correctOption : false;
+                mcQuestions.push({ q, selected: response.selected || null, isCorrect, marks });
+            } else {
+                const maxMarks = q.marks || q.maxMarks || (q.structuralAnswer && q.structuralAnswer.marks) || (q.structuralAnswer && q.structuralAnswer.totalMarks) || 0;
+                longQuestions.push({ q, userText: response.text || '', maxMarks: maxMarks || 0, awarded: 0 });
+            }
+        });
+    });
+
+    const mcTotalMarks = mcQuestions.reduce((sum, row) => sum + (row.marks || 0), 0);
+    const mcScore = mcQuestions.reduce((sum, row) => sum + (row.isCorrect ? (row.marks || 0) : 0), 0);
+    const longTotalMarks = longQuestions.reduce((sum, row) => sum + (row.maxMarks || 0), 0);
+
+    activeAttempt.reviewData = {
+        mcQuestions,
+        longQuestions,
+        mcTotalMarks,
+        mcScore,
+        longTotalMarks,
+        manualMarks: {}
+    };
+
+    renderAnswerReview(autoTriggered);
+}
+
+function renderAnswerReview(autoTriggered) {
+    if (!activeAttempt || !activeAttempt.reviewData) return;
+    const container = document.getElementById('year-content');
+    if (!container) return;
+
+    container.innerHTML = '';
+    const wrapper = document.createElement('div');
+    wrapper.className = 'answer-review';
+
+    const toolbar = document.createElement('div');
+    toolbar.className = 'paper-toolbar';
+    const info = document.createElement('div');
+    info.className = 'countdown-pill';
+    info.textContent = autoTriggered ? 'Time up · Review answers' : 'Review & mark long questions';
+    toolbar.appendChild(info);
+    wrapper.appendChild(toolbar);
+
+    const scoreboard = document.createElement('div');
+    scoreboard.className = 'scoreboard';
+    scoreboard.innerHTML = `
+        <div class="score-chip" id="score-mc">
+            <span>Paper 1A Score</span>
+            <strong>${activeAttempt.reviewData.mcScore}/${activeAttempt.reviewData.mcTotalMarks}</strong>
+        </div>
+        <div class="score-chip" id="score-lq">
+            <span>Long Question Score</span>
+            <strong>0/${activeAttempt.reviewData.longTotalMarks}</strong>
+        </div>
+        <div class="score-chip" id="score-total">
+            <span>Total Score</span>
+            <strong>${activeAttempt.reviewData.mcScore}/${activeAttempt.reviewData.mcTotalMarks + activeAttempt.reviewData.longTotalMarks}</strong>
+        </div>
+    `;
+    wrapper.appendChild(scoreboard);
+
+    if (activeAttempt.reviewData.mcQuestions.length > 0) {
+        const mcPanel = document.createElement('div');
+        mcPanel.className = 'mc-review-list';
+        activeAttempt.reviewData.mcQuestions.forEach((row, idx) => {
+            const item = document.createElement('div');
+            item.className = 'mc-review-item';
+            item.innerHTML = `
+                <span>Q${idx + 1}: ${row.selected || '—'} ➜ ${row.q.correctOption || 'N/A'}</span>
+                <span>${row.isCorrect ? '✓ Correct' : '✗'}</span>
+            `;
+            mcPanel.appendChild(item);
+        });
+        wrapper.appendChild(mcPanel);
+    }
+
+    const lqHeader = document.createElement('h4');
+    lqHeader.textContent = 'Long Question Review';
+    wrapper.appendChild(lqHeader);
+
+    if (activeAttempt.reviewData.longQuestions.length === 0) {
+        const none = document.createElement('div');
+        none.className = 'placeholder-text';
+        none.style.position = 'static';
+        none.textContent = 'No long questions in this paper.';
+        wrapper.appendChild(none);
+    } else {
+        activeAttempt.reviewData.longQuestions.forEach((row, idx) => {
+            const qCard = document.createElement('div');
+            qCard.className = 'paper-question-card';
+            qCard.innerHTML = `
+                <div class="question-meta" style="margin-bottom:10px;">
+                    <span>Q${idx + 1}</span>
+                    <span>${row.q.topicName || ''}</span>
+                </div>
+                <div class="question-text">${processQuestionContent(row.q.question)}</div>
+            `;
+
+            const userAnswer = document.createElement('div');
+            userAnswer.className = 'structural-answer';
+            const keywords = (row.q.structuralAnswer && row.q.structuralAnswer.keywords) || [];
+            userAnswer.innerHTML = `
+                <h4>Your Response</h4>
+                <div>${row.userText ? highlightWithKeywords(row.userText, keywords) : '<em>No response provided.</em>'}</div>
+            `;
+            qCard.appendChild(userAnswer);
+
+            const suggested = document.createElement('div');
+            suggested.className = 'structural-answer';
+            suggested.style.borderLeftColor = '#63b3ed';
+            suggested.innerHTML = `
+                <h4>Suggested Answer</h4>
+                <div>${row.q.structuralAnswer ? processQuestionContent(row.q.structuralAnswer.fullAnswer || '') : 'No answer provided.'}</div>
+            `;
+            qCard.appendChild(suggested);
+
+            const markInput = document.createElement('div');
+            markInput.className = 'mark-input';
+            const label = document.createElement('span');
+            label.textContent = 'Mark Awarded:';
+            markInput.appendChild(label);
+            const input = document.createElement('input');
+            input.type = 'number';
+            input.min = 0;
+            input.step = '0.5';
+            if (row.maxMarks) input.max = row.maxMarks;
+            input.placeholder = '0';
+            input.dataset.questionKey = getQuestionKey(row.q);
+            input.oninput = (e) => handleManualMarkInput(row, parseFloat(e.target.value));
+            markInput.appendChild(input);
+            const maxLabel = document.createElement('span');
+            maxLabel.textContent = `/ ${row.maxMarks || '—'} marks`;
+            markInput.appendChild(maxLabel);
+            qCard.appendChild(markInput);
+
+            wrapper.appendChild(qCard);
+        });
+    }
+
+    const saveBtn = document.createElement('button');
+    saveBtn.className = 'btn btn-check';
+    saveBtn.textContent = 'Finalize & Save Attempt';
+    saveBtn.onclick = () => finalizeAttemptSave();
+    wrapper.appendChild(saveBtn);
+
+    container.appendChild(wrapper);
+}
+
+function handleManualMarkInput(row, value) {
+    if (!activeAttempt || !activeAttempt.reviewData || !row) return;
+    const safeValue = isNaN(value) ? 0 : Math.max(0, value);
+    row.awarded = safeValue;
+    const key = getQuestionKey(row.q);
+    activeAttempt.reviewData.manualMarks[key] = safeValue;
+    updateReviewScoreboard();
+}
+
+function updateReviewScoreboard() {
+    if (!activeAttempt || !activeAttempt.reviewData) return;
+    const longScore = activeAttempt.reviewData.longQuestions.reduce((sum, row) => sum + (row.awarded || 0), 0);
+    const scoreLq = document.getElementById('score-lq');
+    if (scoreLq) {
+        scoreLq.querySelector('strong').textContent = `${longScore}/${activeAttempt.reviewData.longTotalMarks}`;
+    }
+    const scoreTotal = document.getElementById('score-total');
+    if (scoreTotal) {
+        const grandTotal = activeAttempt.reviewData.mcTotalMarks + activeAttempt.reviewData.longTotalMarks;
+        scoreTotal.querySelector('strong').textContent = `${activeAttempt.reviewData.mcScore + longScore}/${grandTotal}`;
+    }
+}
+
+function finalizeAttemptSave() {
+    if (!activeAttempt || !activeAttempt.reviewData) return;
+    const lqRequired = activeAttempt.reviewData.longQuestions.some(row => row.maxMarks > 0);
+    if (lqRequired) {
+        const incomplete = activeAttempt.reviewData.longQuestions.some(row => row.maxMarks > 0 && (row.awarded === undefined || row.awarded === null));
+        if (incomplete) {
+            const proceed = confirm('Some long questions have no awarded marks. Save anyway?');
+            if (!proceed) return;
+        }
+    }
+
+    const longScore = activeAttempt.reviewData.longQuestions.reduce((sum, row) => sum + (row.awarded || 0), 0);
+    const summary = {
+        timestamp: new Date().toISOString(),
+        yearKey: activeAttempt.yearKey,
+        mode: activeAttempt.mode,
+        durationSeconds: activeAttempt.durationSeconds,
+        timeUsedSeconds: activeAttempt.durationSeconds - activeAttempt.remainingSeconds,
+        mcScore: activeAttempt.reviewData.mcScore,
+        mcTotal: activeAttempt.reviewData.mcTotalMarks,
+        lqScore: longScore,
+        lqTotal: activeAttempt.reviewData.longTotalMarks,
+        breakdown: {
+            mc: activeAttempt.reviewData.mcQuestions.map(row => ({ question: getQuestionKey(row.q), correct: row.isCorrect })),
+            long: activeAttempt.reviewData.longQuestions.map(row => ({ question: getQuestionKey(row.q), awarded: row.awarded || 0, maxMarks: row.maxMarks || 0 }))
+        }
+    };
+
+    saveAttemptHistoryEntry(summary);
+
+    activeAttempt.reviewData.mcQuestions.forEach(row => {
+        recordQuestionAttempt(row.q, row.isCorrect);
+    });
+    activeAttempt.reviewData.longQuestions.forEach(row => {
+        if (row.maxMarks > 0) {
+            const given = typeof row.awarded === 'number' ? row.awarded : 0;
+            const isPerfect = given >= row.maxMarks;
+            recordQuestionAttempt(row.q, row.awarded === undefined ? null : isPerfect);
+        } else {
+            recordQuestionAttempt(row.q, null);
+        }
+    });
+
+    alert('Attempt stored locally. Great work!');
+    renderYearLanding(activeAttempt.yearKey);
+    activeAttempt = null;
+}
+
+function saveAttemptHistoryEntry(entry) {
+    try {
+        const historyRaw = localStorage.getItem(STORAGE_KEYS.attempts);
+        const history = historyRaw ? JSON.parse(historyRaw) : [];
+        history.push(entry);
+        localStorage.setItem(STORAGE_KEYS.attempts, JSON.stringify(history));
+    } catch (err) {
+        console.error('Unable to save attempt history', err);
+    }
+}
+
+function formatSeconds(totalSeconds) {
+    const seconds = Math.max(0, Math.floor(totalSeconds));
+    const hrs = String(Math.floor(seconds / 3600)).padStart(2, '0');
+    const mins = String(Math.floor((seconds % 3600) / 60)).padStart(2, '0');
+    const secs = String(seconds % 60).padStart(2, '0');
+    return `${hrs}:${mins}:${secs}`;
 }
 
 function renderTopicSidebar() {
@@ -320,6 +1063,7 @@ function renderTopicSidebar() {
             
             // Also ask user in main content
             const contentDiv = document.getElementById('topic-content');
+            const topicStats = getTopicStats(topic.id);
             contentDiv.innerHTML = `
                 <div style="text-align:center; padding: 50px;">
                     <h3>${topic.name}</h3>
@@ -327,6 +1071,11 @@ function renderTopicSidebar() {
                     <div style="display:flex; gap:20px; justify-content:center; margin-top:20px;">
                         <button class="btn large" id="btn-mcq-${topic.id}">Multiple Choice (${mcqQuestions.length})</button>
                         <button class="btn large" id="btn-struct-${topic.id}">Structural (${structQuestions.length})</button>
+                    </div>
+                    <div class="topic-stats-banner">
+                        <div><span>Attempts</span><strong>${topicStats.attempts || 0}</strong></div>
+                        <div><span>Correct</span><strong>${topicStats.correct || 0}</strong></div>
+                        <div><span>Incorrect</span><strong>${topicStats.incorrect || 0}</strong></div>
                     </div>
                 </div>
             `;
@@ -378,6 +1127,12 @@ function renderCurrentQuestion() {
         <span>${q.topicName || ''}</span>
     `;
     card.appendChild(meta);
+
+    const qStats = getQuestionStatsEntry(q);
+    const statsChip = document.createElement('div');
+    statsChip.className = 'question-stats-chip';
+    statsChip.innerHTML = `<span>Attempts ${qStats.attempts || 0}</span><span>Correct ${qStats.correct || 0}</span><span>Incorrect ${qStats.incorrect || 0}</span>`;
+    card.appendChild(statsChip);
     
     // Question Text (allow inline images/HTML from stored content)
     const text = document.createElement('div');
@@ -627,6 +1382,8 @@ function checkAnswer(q, cardElement) {
                 opt.classList.add('wrong-answer');
             }
         });
+
+        recordQuestionAttempt(q, isCorrect);
         
     } else {
         // Structural
@@ -713,6 +1470,8 @@ function checkAnswer(q, cardElement) {
                 input.previousElementSibling.style.display = 'none';
             }
         }
+
+        recordQuestionAttempt(q, null);
     }
     
     // Toggle Buttons
