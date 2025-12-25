@@ -234,11 +234,34 @@ function buildYearIndex() {
                 key,
                 source: q.source,
                 year: q.year,
-                parts: { '1A': [], '1B': [], '2': [] }
+                parts: { '1A': [], '1B': [], '2': [] },
+                partKeys: { '1A': new Set(), '1B': new Set(), '2': new Set() }
             };
         }
         const part = getPaperPart(q);
+        if (!yearIndex[key].parts[part]) {
+            yearIndex[key].parts[part] = [];
+            yearIndex[key].partKeys[part] = new Set();
+        }
+        const questionKey = getYearQuestionKey(q);
+        const partSet = yearIndex[key].partKeys[part];
+        if (partSet.has(questionKey)) return;
+        partSet.add(questionKey);
         yearIndex[key].parts[part].push(q);
+    });
+    // After populating, sort each part by derived question number (ascending)
+    Object.keys(yearIndex).forEach(yk => {
+        const y = yearIndex[yk];
+        Object.keys(y.parts).forEach(part => {
+            y.parts[part].sort((a, b) => {
+                const na = getQuestionNumber(a);
+                const nb = getQuestionNumber(b);
+                if (na !== null && nb !== null) return na - nb;
+                if (na !== null) return -1;
+                if (nb !== null) return 1;
+                return 0;
+            });
+        });
     });
 }
 
@@ -250,6 +273,35 @@ function getPaperPart(q) {
     if (topicId.includes('elective')) return '2';
     if ((q.section || '').toLowerCase().includes('elective')) return '2';
     return '1B';
+}
+
+// Derive a numeric question number if available from common fields or question text
+function getQuestionNumber(q) {
+    if (!q) return null;
+    const tryFields = ['questionNumber', 'question_no', 'qno', 'qNo', 'number', 'no', 'index', 'questionNo', 'qn'];
+    for (const f of tryFields) {
+        if (q[f] !== undefined && q[f] !== null && q[f] !== '') {
+            const n = Number(q[f]);
+            if (!isNaN(n)) return n;
+        }
+    }
+    if (q.id) {
+        const m = String(q.id).match(/(\d+)/);
+        if (m) return Number(m[1]);
+    }
+    const txt = (q.question || '').trim();
+    const m = txt.match(/^\s*(?:Q\s*)?(\d+)[\.)\s]/i);
+    if (m) return Number(m[1]);
+    return null;
+}
+
+// Build a per-year unique key that ignores topic mappings to avoid duplicates in year view
+function getYearQuestionKey(q) {
+    if (!q) return 'unknown-year-key';
+    const num = getQuestionNumber(q);
+    const numberPart = num !== null ? `num-${num}` : `text-${normalizeTextKey(q.question || '')}`;
+    const base = `${q.source || 'src'}-${q.year || 'year'}-${getPaperPart(q)}`;
+    return `${base}-${numberPart}`;
 }
 
 function resolveImageUrl(path) {
@@ -506,8 +558,9 @@ function renderYearPreview(yearKey) {
 function createPreviewCard(q, index) {
     const card = document.createElement('div');
     card.className = 'preview-card';
+    const qNum = getQuestionNumber(q) || (index + 1);
     card.innerHTML = `
-        <div style="font-size:0.85em; color:#a0aec0; letter-spacing:0.08em; text-transform:uppercase; margin-bottom:8px;">Q${index + 1} · ${q.topicName || ''}</div>
+        <div style="font-size:0.85em; color:#a0aec0; letter-spacing:0.08em; text-transform:uppercase; margin-bottom:8px;">Q${qNum} · ${q.topicName || ''}</div>
         <div class="question-text" style="margin-bottom:10px;">${processQuestionContent(q.question)}</div>
     `;
     if (q.image) {
@@ -646,9 +699,10 @@ function renderPaperAttempt() {
             const qCard = document.createElement('div');
             qCard.className = 'paper-question-card';
             const questionKey = getQuestionKey(q);
+            const displayQNum = getQuestionNumber(q) || (idx + 1);
             qCard.innerHTML = `
                 <div class="question-meta" style="margin-bottom:10px;">
-                    <span>${section.part} · Q${idx + 1}</span>
+                    <span>${section.part} · Q${displayQNum}</span>
                     <span>${q.topicName || ''}</span>
                     <span>${q.source || ''} ${q.year || ''}</span>
                 </div>
